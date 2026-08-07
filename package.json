@@ -1,0 +1,15 @@
+{
+  "name": "fieldpulse",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "install:all": "npm install --prefix server && npm install --prefix client",
+    "dev:server": "npm run dev --prefix server",
+    "dev:client": "npm run dev --prefix client",
+    "setup": "npm run setup --prefix server",
+    "migrate": "npm run migrate --prefix server",
+    "seed": "npm run seed --prefix server",
+    "test": "npm test --prefix server && npm test --prefix client",
+    "docker:up": "docker compose up --build -d"
+  }
+}

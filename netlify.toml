@@ -1,0 +1,16 @@
+# Netlify hosts the React client only.
+# Point VITE_API_URL at your hosted API (Render/Railway/etc.) in Netlify env vars.
+
+[build]
+  base = "client"
+  command = "npm install && npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+# SPA routing
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
