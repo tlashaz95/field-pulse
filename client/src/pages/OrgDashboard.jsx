@@ -12,13 +12,16 @@ import {
 } from '../components/Charts.jsx';
 import QueryPanel from '../components/QueryPanel.jsx';
 import EquipmentTable, { EventsList } from '../components/EquipmentTable.jsx';
+import DeploymentMap from '../components/DeploymentMap.jsx';
 import Logo from '../components/Logo.jsx';
+import { useLocationEvents } from '../hooks/useLocationEvents.js';
 
 export default function OrgDashboard() {
   const { orgId } = useParams();
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
+  const { connected, lastPulseAt, liveEvents } = useLocationEvents(true);
 
   useEffect(() => {
     let cancelled = false;
@@ -45,6 +48,12 @@ export default function OrgDashboard() {
   const isDivision = data?.org?.org_level === 'division';
   const showUnitColumn = data?.org?.org_level !== 'battalion';
   const showBreadcrumb = Boolean(orgId) && (data?.breadcrumb?.length || 0) > 1;
+
+  const scopedLiveEvents = useMemo(() => {
+    if (!data?.map_markers?.length || !liveEvents?.length) return liveEvents || [];
+    const ids = new Set(data.map_markers.map((m) => m.id));
+    return liveEvents.filter((e) => ids.has(e.org_id));
+  }, [data?.map_markers, liveEvents]);
 
   if (loading) {
     return (
@@ -87,6 +96,14 @@ export default function OrgDashboard() {
       </header>
 
       <QueryPanel enabled={isDivision} />
+
+      <DeploymentMap
+        focusOrgId={org.id}
+        markers={data.map_markers || []}
+        liveEvents={scopedLiveEvents}
+        lastPulseAt={lastPulseAt}
+        connected={connected}
+      />
 
       <section className="ops-split">
         <div className="ops-left">

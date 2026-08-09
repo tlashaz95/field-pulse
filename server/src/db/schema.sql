@@ -14,12 +14,22 @@ CREATE TABLE IF NOT EXISTS orgs (
   status TEXT NOT NULL DEFAULT 'operational',
   notes TEXT,
   sort_order INT NOT NULL DEFAULT 0,
+  lat DOUBLE PRECISION,
+  lng DOUBLE PRECISION,
+  position_reported_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Existing DBs created before geo columns
+ALTER TABLE orgs ADD COLUMN IF NOT EXISTS lat DOUBLE PRECISION;
+ALTER TABLE orgs ADD COLUMN IF NOT EXISTS lng DOUBLE PRECISION;
+ALTER TABLE orgs ADD COLUMN IF NOT EXISTS position_reported_at TIMESTAMPTZ;
 
 CREATE INDEX IF NOT EXISTS idx_orgs_parent ON orgs (parent_id);
 CREATE INDEX IF NOT EXISTS idx_orgs_level ON orgs (org_level);
 CREATE INDEX IF NOT EXISTS idx_orgs_arm ON orgs (arm);
+CREATE INDEX IF NOT EXISTS idx_orgs_position ON orgs (lat, lng)
+  WHERE lat IS NOT NULL AND lng IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS equipment (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -63,6 +73,21 @@ CREATE TABLE IF NOT EXISTS operational_events (
 
 CREATE INDEX IF NOT EXISTS idx_events_org_time
   ON operational_events (org_id, occurred_at DESC);
+
+-- Event log for deployment position heartbeats / moves (event-driven map)
+CREATE TABLE IF NOT EXISTS location_events (
+  id BIGSERIAL PRIMARY KEY,
+  org_id UUID NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
+  lat DOUBLE PRECISION NOT NULL,
+  lng DOUBLE PRECISION NOT NULL,
+  changed BOOLEAN NOT NULL DEFAULT FALSE,
+  reported_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_location_events_time
+  ON location_events (reported_at DESC);
+CREATE INDEX IF NOT EXISTS idx_location_events_org_time
+  ON location_events (org_id, reported_at DESC);
 
 -- Drop legacy FieldPulse tables if present
 DROP TABLE IF EXISTS telemetry_readings CASCADE;

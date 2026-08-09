@@ -12,19 +12,6 @@ export async function getOrgById(id) {
   return result.rows[0] || null;
 }
 
-export async function getOrgByCode(code) {
-  const result = await query(`SELECT * FROM orgs WHERE code = $1`, [code]);
-  return result.rows[0] || null;
-}
-
-export async function getChildren(parentId) {
-  const result = await query(
-    `SELECT * FROM orgs WHERE parent_id = $1 ORDER BY sort_order, short_name`,
-    [parentId]
-  );
-  return result.rows;
-}
-
 export async function getAncestors(orgId) {
   const result = await query(
     `WITH RECURSIVE chain AS (
@@ -37,19 +24,6 @@ export async function getAncestors(orgId) {
     [orgId]
   );
   return result.rows.reverse();
-}
-
-export async function getDescendantIds(orgId) {
-  const result = await query(
-    `WITH RECURSIVE tree AS (
-       SELECT id FROM orgs WHERE id = $1
-       UNION ALL
-       SELECT o.id FROM orgs o JOIN tree t ON o.parent_id = t.id
-     )
-     SELECT id FROM tree`,
-    [orgId]
-  );
-  return result.rows.map((r) => r.id);
 }
 
 export async function getEquipmentForOrg(orgId, { includeDescendants = false } = {}) {
@@ -144,7 +118,8 @@ export async function getEvents(orgId, { includeDescendants = true, limit = 20 }
 
 export async function getChildReadiness(parentId) {
   const result = await query(
-    `SELECT id, code, short_name, name, org_level, arm, location, wartime_only,
+    `SELECT id, code, short_name, name, org_level, arm, location, lat, lng,
+            position_reported_at, wartime_only,
             readiness_pct, personnel_authorised, personnel_present, status
      FROM orgs
      WHERE parent_id = $1
@@ -154,11 +129,40 @@ export async function getChildReadiness(parentId) {
   return result.rows;
 }
 
+/** Focus org + descendants with coordinates for the deployment map. */
+export async function getMapMarkers(orgId) {
+  const result = await query(
+    `WITH RECURSIVE tree AS (
+       SELECT id, parent_id, code, short_name, org_level, arm, location,
+              lat, lng, position_reported_at, wartime_only, readiness_pct
+       FROM orgs WHERE id = $1
+       UNION ALL
+       SELECT o.id, o.parent_id, o.code, o.short_name, o.org_level, o.arm, o.location,
+              o.lat, o.lng, o.position_reported_at, o.wartime_only, o.readiness_pct
+       FROM orgs o
+       JOIN tree t ON o.parent_id = t.id
+     )
+     SELECT * FROM tree
+     WHERE lat IS NOT NULL AND lng IS NOT NULL
+     ORDER BY
+       CASE org_level
+         WHEN 'division' THEN 0
+         WHEN 'group' THEN 1
+         WHEN 'brigade' THEN 2
+         WHEN 'hq' THEN 3
+         ELSE 4
+       END,
+       short_name`,
+    [orgId]
+  );
+  return result.rows;
+}
+
 export async function buildDashboard(orgId) {
   const org = await getOrgById(orgId);
   if (!org) return null;
 
-  const [ancestors, children, equipmentSummary, equipmentDetail, readiness, events] =
+  const [ancestors, children, equipmentSummary, equipmentDetail, readiness, events, mapMarkers] =
     await Promise.all([
       getAncestors(orgId),
       getChildReadiness(orgId),
@@ -168,6 +172,7 @@ export async function buildDashboard(orgId) {
       }),
       getReadinessSeries(orgId),
       getEvents(orgId),
+      getMapMarkers(orgId),
     ]);
 
   const personnelFill =
@@ -206,6 +211,7 @@ export async function buildDashboard(orgId) {
     equipment: equipmentDetail,
     readiness_trend: readiness,
     events,
+    map_markers: mapMarkers,
   };
 }
 

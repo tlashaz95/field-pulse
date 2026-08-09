@@ -1,14 +1,6 @@
 import { useState } from 'react';
 import { runQuery } from '../api.js';
 
-const SUGGESTIONS = [
-  'What is the overall tank and APC serviceability across the division?',
-  'Summarise bridging and engineer assets under Div Troops',
-  'Which brigades have the lowest readiness?',
-  'What wartime or attached formations are on the ORBAT?',
-  'Give a signals / communications node status for 6 Sig Bn',
-];
-
 function modeLabel(result) {
   if (result.provider) return result.provider;
   if (result.mode === 'groq') return 'Groq';
@@ -17,7 +9,7 @@ function modeLabel(result) {
 }
 
 export default function QueryPanel({ enabled }) {
-  const [question, setQuestion] = useState(SUGGESTIONS[0]);
+  const [question, setQuestion] = useState('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
@@ -54,15 +46,9 @@ export default function QueryPanel({ enabled }) {
           rows={3}
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
+          placeholder="Ask about readiness, equipment, or formations…"
         />
         <div className="query-actions">
-          <div className="suggestions">
-            {SUGGESTIONS.map((s) => (
-              <button key={s} type="button" className="chip" onClick={() => setQuestion(s)}>
-                {s}
-              </button>
-            ))}
-          </div>
           <button type="submit" className="primary-btn" disabled={loading || !question.trim()}>
             {loading ? 'Running…' : 'Ask'}
           </button>

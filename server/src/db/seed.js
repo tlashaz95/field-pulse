@@ -34,13 +34,39 @@ function personnel(authorised) {
   return { personnel_authorised: authorised, personnel_present: present };
 }
 
+/** Approximate garrison / deployment anchors (synthetic training coords). */
+const LOCATION_COORDS = {
+  Gujranwala: { lat: 32.1877, lng: 74.1945 },
+  Mangla: { lat: 33.142, lng: 73.639 },
+  Dispersed: { lat: 32.55, lng: 73.95 },
+};
+
+function hashCode(s) {
+  let h = 0;
+  for (let i = 0; i < s.length; i += 1) h = (Math.imul(31, h) + s.charCodeAt(i)) | 0;
+  return Math.abs(h);
+}
+
+function coordsFor(location, code) {
+  const base = LOCATION_COORDS[location] || LOCATION_COORDS.Gujranwala;
+  const h = hashCode(code || 'ORG');
+  const lat = base.lat + ((h % 1000) / 1000 - 0.5) * 0.09;
+  const lng = base.lng + ((((h / 1000) | 0) % 1000) / 1000 - 0.5) * 0.09;
+  return { lat: Number(lat.toFixed(6)), lng: Number(lng.toFixed(6)) };
+}
+
 async function insertOrg(org) {
+  const geo =
+    org.lat != null && org.lng != null
+      ? { lat: org.lat, lng: org.lng }
+      : coordsFor(org.location, org.code);
+
   const result = await query(
     `INSERT INTO orgs (
        parent_id, code, name, short_name, org_level, arm, location,
        wartime_only, readiness_pct, personnel_authorised, personnel_present,
-       status, notes, sort_order
-     ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+       status, notes, sort_order, lat, lng, position_reported_at
+     ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,NOW())
      RETURNING id`,
     [
       org.parent_id ?? null,
@@ -57,6 +83,8 @@ async function insertOrg(org) {
       org.status ?? 'operational',
       org.notes ?? null,
       org.sort_order ?? 0,
+      geo.lat,
+      geo.lng,
     ]
   );
   return result.rows[0].id;
@@ -258,7 +286,9 @@ async function addBn(parentId, def, equipmentFn) {
 
 async function seed() {
   console.log('Resetting operational data…');
-  await query('TRUNCATE operational_events, readiness_samples, equipment, orgs RESTART IDENTITY CASCADE');
+  await query(
+    'TRUNCATE location_events, operational_events, readiness_samples, equipment, orgs RESTART IDENTITY CASCADE'
+  );
 
   const divP = personnel(14800);
   const divisionId = await insertOrg({

@@ -1,5 +1,5 @@
-# Optional one-click-ish Render blueprint for API + Postgres.
-# Netlify still hosts the frontend; set VITE_API_URL to this API's public URL.
+# Optional Render blueprint: API + Postgres + Static UI (all on Render).
+# After deploy, set CLIENT_ORIGIN on the API to the static site URL.
 
 databases:
   - name: fieldpulse-db
@@ -22,8 +22,6 @@ services:
           property: connectionString
       - key: NODE_VERSION
         value: "20"
-      - key: PORT
-        value: "3001"
       - key: HOST
         value: "0.0.0.0"
       - key: CLIENT_ORIGIN
@@ -32,3 +30,22 @@ services:
         sync: false
       - key: GROQ_MODEL
         value: llama-3.1-8b-instant
+      - key: LOCATION_TICK_MS
+        value: "60000"
+
+  # Publish path is relative to repo root (not client/).
+  - type: web
+    name: fieldpulse-ui
+    runtime: static
+    rootDir: client
+    buildCommand: npm install && npm run build
+    staticPublishPath: ./dist
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: VITE_API_URL
+        sync: false

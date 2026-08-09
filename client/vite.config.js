@@ -9,10 +9,7 @@ export default defineConfig({
       '/orgs': 'http://localhost:3001',
       '/query': 'http://localhost:3001',
       '/health': 'http://localhost:3001',
-      '/ws': {
-        target: 'ws://localhost:3001',
-        ws: true,
-      },
+      '/events': 'http://localhost:3001',
     },
   },
 });

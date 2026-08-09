@@ -199,7 +199,7 @@ async function chatCompletions({ baseUrl, apiKey, model, question, ctx, mode }) 
 }
 
 /** Groq free tier — OpenAI-compatible API. https://console.groq.com */
-export async function answerWithGroq(question, ctx) {
+async function answerWithGroq(question, ctx) {
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) return null;
 
@@ -214,7 +214,7 @@ export async function answerWithGroq(question, ctx) {
 }
 
 /** Optional paid OpenAI fallback */
-export async function answerWithOpenAI(question, ctx) {
+async function answerWithOpenAI(question, ctx) {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) return null;
 

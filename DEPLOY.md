@@ -1,100 +1,119 @@
-# Deploy FieldPulse
+# Deploy FieldPulse (Render)
 
-FieldPulse has **three** pieces. Netlify only covers the first.
+Live stack (all on Render):
 
-| Piece | Free host |
-|-------|-----------|
-| React client | **Netlify** |
-| Express API | **Render** (or Railway / Fly) |
-| PostgreSQL | **Render Postgres** (free tier) / Railway |
+| Piece | URL |
+|-------|-----|
+| **UI (Static Site)** | https://field-pulse-1.onrender.com |
+| **API (Web Service)** | https://field-pulse.onrender.com |
+| **Database** | Render Postgres (linked to the API) |
 
-Netlify cannot run long-lived Express + Postgres. Use Netlify for the UI and Render (recommended) for API + DB.
+- UI → API via `VITE_API_URL=https://field-pulse.onrender.com`
+- API CORS → `CLIENT_ORIGIN=https://field-pulse-1.onrender.com`
+- Open the **static site** for the dashboard. The API root (`/`) is not a webpage; use `/health` to check the API.
 
 ---
 
-## 1. Push to GitHub
+## Architecture (production)
 
-Already done if you followed the agent steps. Otherwise:
-
-```bash
-cd /Users/macbook/Documents/Dev/field-pulse
-git init
-git add .
-git commit -m "Initial FieldPulse division ops dashboard"
-gh repo create field-pulse --public --source=. --remote=origin --push
+```text
+Browser
+   │
+   ├─ REST ──► Static Site UI ──VITE_API_URL──► Express API ──► Postgres
+   │                                      │
+   └─ SSE ──► GET /events/locations ──────┘
+              (location.batch from ticker)
 ```
 
-Personal notes (`interview-prep/`, `my-thinking.md`) are gitignored and stay local.
-
+API also runs the **location ticker** (producer) and **SSE hub** (fan-out). Map markers update from events; dashboard REST remains a point-in-time snapshot.
 ---
 
-## 2. Deploy API + DB on Render (required for a live UI)
+## Recreate from scratch
 
-1. Go to [render.com](https://render.com) → sign up with GitHub  
-2. **New** → **Blueprint** → select `field-pulse` → uses [`render.yaml`](render.yaml)  
-   - Or manually: create **PostgreSQL** (free) + **Web Service** from `server/`  
-3. Web service settings if manual:  
-   - Root directory: `server`  
-   - Build: `npm install`  
-   - Start: `npm run setup && npm start`  
-4. Environment variables on the API service:
+### 1. Postgres
+Render → **New** → **PostgreSQL** (free) → note the **Internal Database URL**.
+
+### 2. API Web Service
+| Setting | Value |
+|---------|--------|
+| Repo | `tlashaz95/field-pulse` |
+| Root Directory | `server` |
+| Runtime | Node |
+| Build Command | `npm install` |
+| Start Command | `npm run setup && npm start` |
+
+**Environment variables:**
 
 | Key | Value |
 |-----|--------|
-| `DATABASE_URL` | from Render Postgres (auto if Blueprint) |
-| `CLIENT_ORIGIN` | your Netlify URL, e.g. `https://your-app.netlify.app` |
+| `DATABASE_URL` | Internal Database URL from Postgres (or link the DB in the UI) |
+| `HOST` | `0.0.0.0` |
 | `GROQ_API_KEY` | your Groq key |
 | `GROQ_MODEL` | `llama-3.1-8b-instant` |
-| `PORT` | `3001` (or leave Render’s `PORT` if they inject one — then set start to use `$PORT`) |
+| `CLIENT_ORIGIN` | `https://field-pulse-1.onrender.com` (set after UI exists) |
+| `PUBLIC_UI_URL` | `https://field-pulse-1.onrender.com` (optional; shown on API `/`) |
+| `LOCATION_TICK_MS` | `60000` (optional; location heartbeat interval) |
 
-**PORT note:** Render often sets `PORT` itself. Prefer start command:
+Leave `PORT` unset — Render injects it.
 
-```bash
-npm run setup && node src/index.js
-```
+Verify: https://field-pulse.onrender.com/health → `{"status":"ok","db":true}`
 
-and ensure the app listens on `process.env.PORT` (FieldPulse already does).
+Free web services **sleep when idle**; the first request after idle can take 30–60s.
 
-5. Copy the API URL, e.g. `https://fieldpulse-api.onrender.com`  
-6. Open `/health` — should return `{"status":"ok","db":true}`
+### 3. Static Site (UI)
+`dist` is **not** in GitHub — Render creates it at build time.
 
-Free Render web services **spin down** after idle; first request may take ~30–60s.
+**Preferred settings:**
 
----
+| Setting | Value |
+|---------|--------|
+| Root Directory | `client` |
+| Build Command | `npm install && npm run build` |
+| Publish Directory | `dist` |
 
-## 3. Deploy frontend on Netlify
+**If that fails, use:**
 
-1. [app.netlify.com](https://app.netlify.com) → **Add new site** → **Import from Git** → `field-pulse`  
-2. Build settings (also in [`netlify.toml`](netlify.toml)):  
-   - Base directory: `client`  
-   - Build command: `npm install && npm run build`  
-   - Publish directory: `client/dist`  
-3. **Site settings → Environment variables**:
+| Setting | Value |
+|---------|--------|
+| Root Directory | *(empty)* |
+| Build Command | `cd client && npm install && npm run build` |
+| Publish Directory | `client/dist` |
+
+**Do not** set Root = `client` and Publish = `client/dist` (looks for `client/client/dist`).
+
+**Environment variable on the static site:**
 
 | Key | Value |
 |-----|--------|
-| `VITE_API_URL` | `https://fieldpulse-api.onrender.com` (no trailing slash) |
+| `VITE_API_URL` | `https://field-pulse.onrender.com` (no trailing slash) |
 
-4. Deploy. Open the Netlify URL.
+Add an SPA rewrite if needed: `/*` → `/index.html`.
 
-5. On Render, set `CLIENT_ORIGIN` to that Netlify URL (and redeploy API) so CORS allows the browser.
+Verify: https://field-pulse-1.onrender.com loads the division dashboard.
 
----
-
-## 4. Verify live
-
-1. Netlify site loads the division dashboard  
-2. Brigades click-through works  
-3. Intelligence query returns `mode: groq` (or rules if no key)  
-4. If UI loads but data fails: check `VITE_API_URL`, CORS `CLIENT_ORIGIN`, and Render logs  
+### 4. CORS
+After the static site URL is known, set `CLIENT_ORIGIN` on the API and **redeploy** the API.
 
 ---
 
-## Local reminder
+## Local Docker
 
 ```bash
-docker compose up -d --build
-# UI http://localhost:8080
+cp .env.example .env   # set GROQ_API_KEY
+docker compose up --build -d
+# UI  http://localhost:8080
+# API http://localhost:3001/health
 ```
 
-Never commit `.env` / `GROQ_API_KEY`.
+---
+
+## Checklist
+
+- [ ] `/health` on API returns ok + db true  
+- [ ] Static site loads ORBAT / charts / **deployment map**  
+- [ ] Brigade drill-down works  
+- [ ] Map shows **SSE live** and a pulse within ~1 minute  
+- [ ] Intelligence query returns `mode: groq` (or `rules` without a key)  
+- [ ] `CLIENT_ORIGIN` matches the static site URL  
+
+Never commit `.env` or API keys. See also [`render.yaml`](render.yaml) for a Blueprint-style definition.
