@@ -22,10 +22,10 @@ Browser
    ├─ REST ──► Static Site UI ──VITE_API_URL──► Express API ──► Postgres
    │                                      │
    └─ SSE ──► GET /events/locations ──────┘
-              (location.batch from ticker)
+              (location.batch: Kafka locally, in-process on Render)
 ```
 
-API also runs the **location ticker** (producer) and **SSE hub** (fan-out). Map markers update from events; dashboard REST remains a point-in-time snapshot.
+API runs the **location ticker** (producer). With `KAFKA_BROKERS` it publishes to Kafka and a consumer persists + SSE-fans-out. On Render leave Kafka unset — same events, in-process bus. Dashboard REST stays a snapshot; the map updates from SSE.
 ---
 
 ## Recreate from scratch
@@ -49,7 +49,7 @@ Render → **New** → **PostgreSQL** (free) → note the **Internal Database UR
 | `DATABASE_URL` | Internal Database URL from Postgres (or link the DB in the UI) |
 | `HOST` | `0.0.0.0` |
 | `GROQ_API_KEY` | your Groq key |
-| `GROQ_MODEL` | `llama-3.1-8b-instant` |
+| `GROQ_MODEL` | `openai/gpt-oss-20b` |
 | `CLIENT_ORIGIN` | `https://field-pulse-1.onrender.com` (set after UI exists) |
 | `PUBLIC_UI_URL` | `https://field-pulse-1.onrender.com` (optional; shown on API `/`) |
 | `LOCATION_TICK_MS` | `60000` (optional; location heartbeat interval) |
@@ -113,6 +113,7 @@ docker compose up --build -d
 - [ ] Static site loads ORBAT / charts / **deployment map**  
 - [ ] Brigade drill-down works  
 - [ ] Map shows **SSE live** and a pulse within ~1 minute  
+- [ ] Local Docker: `/health` shows `kafka.enabled: true` (Render may show `enabled: false`)  
 - [ ] Intelligence query returns `mode: groq` (or `rules` without a key)  
 - [ ] `CLIENT_ORIGIN` matches the static site URL  
 

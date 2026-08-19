@@ -206,7 +206,7 @@ async function answerWithGroq(question, ctx) {
   return chatCompletions({
     baseUrl: process.env.GROQ_BASE_URL || 'https://api.groq.com/openai/v1',
     apiKey,
-    model: process.env.GROQ_MODEL || 'llama-3.1-8b-instant',
+    model: process.env.GROQ_MODEL || 'openai/gpt-oss-20b',
     question,
     ctx,
     mode: 'groq',

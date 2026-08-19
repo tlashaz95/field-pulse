@@ -65,7 +65,7 @@ sequenceDiagram
 `QueryPanel` posts `{ question }` to `/query` and displays:
 
 - Provider pill (`Groq` / `OpenAI` / `Rules engine`)
-- Model pill (e.g. `llama-3.1-8b-instant`)
+- Model pill (e.g. `openai/gpt-oss-20b`)
 - Answer text
 - **Context used** cards (human-readable, not raw JSON counts)
 
@@ -125,7 +125,7 @@ LLM answers return a `sources` array of `{ label, detail }` cards, e.g. “Forma
 | Variable | Meaning |
 |----------|---------|
 | `GROQ_API_KEY` | Free key from [console.groq.com/keys](https://console.groq.com/keys) |
-| `GROQ_MODEL` | Default `llama-3.1-8b-instant` |
+| `GROQ_MODEL` | Default `openai/gpt-oss-20b` |
 | `OPENAI_API_KEY` | Optional paid fallback |
 | `OPENAI_MODEL` | Default `gpt-4o-mini` |
 
